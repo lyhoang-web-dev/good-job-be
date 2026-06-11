@@ -1,0 +1,28 @@
+# Dependencies & build output (rebuilt in image)
+node_modules
+dist
+
+# Git & IDE
+.git
+.gitignore
+.cursor
+*.md
+
+# Env & local secrets (inject at runtime)
+.env
+.env.*
+!.env.example
+
+# Tests & tooling
+coverage
+tests
+jest.config.js
+*/.spec.ts
+*/.test.ts
+
+# Uploads & local data (use volumes in compose / k8s)
+uploads
+
+# Misc
+npm-debug.log*
+.DS_Store

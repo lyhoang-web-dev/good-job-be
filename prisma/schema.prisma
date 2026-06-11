@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  user
+  admin
+}
+
+enum CoreValue {
+  teamwork
+  ownership
+  innovation
+  integrity
+  customer_focus
+}
+
+enum KudoStatus {
+  pending_media
+  active
+}
+
+enum MediaType {
+  image
+  video
+}
+
+enum MediaStatus {
+  processing
+  ready
+  failed
+}
+
+enum LedgerType {
+  received
+  redeemed
+}
+
+enum RedemptionStatus {
+  pending
+  completed
+  failed
+}
+
+enum NotificationType {
+  kudo_received
+  reaction
+  comment
+  redemption_success
+}
+
+enum AuthProvider {
+  local
+  google
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  avatarUrl    String?  @map("avatar_url")
+  password     String?
+  googleId     String?        @unique @map("google_id")
+  authProvider AuthProvider   @default(local) @map("auth_provider")
+  role         Role     @default(user)
+  balance      Int      @default(0)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  givingBudgets GivingBudget[]
+  kudosSent     Kudo[]         @relation("KudoSender")
+  kudosReceived Kudo[]         @relation("KudoReceiver")
+  pointLedger   PointLedger[]
+  redemptions   Redemption[]
+  reactions     Reaction[]
+  comments      Comment[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model GivingBudget {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  yearMonth  String   @map("year_month")   // format: "2025-04"
+  usedPoints Int      @default(0) @map("used_points")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  // Mỗi user chỉ có 1 record per tháng — nền tảng lazy reset
+  @@unique([userId, yearMonth])
+  @@index([userId, yearMonth])
+  @@map("giving_budgets")
+}
+
+model Kudo {
+  id         String     @id @default(uuid())
+  senderId   String     @map("sender_id")
+  receiverId String     @map("receiver_id")
+  points     Int
+  message    String
+  coreValue  CoreValue  @map("core_value")
+  status     KudoStatus @default(active)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  sender    User          @relation("KudoSender",   fields: [senderId],   references: [id])
+  receiver  User          @relation("KudoReceiver", fields: [receiverId], references: [id])
+  media     KudoMedia[]
+  reactions Reaction[]
+  comments  Comment[]
+  ledger    PointLedger[]
+
+  // Index cho feed query: WHERE status='active' ORDER BY created_at DESC
+  @@index([status, createdAt(sort: Desc)])
+  // Index cho profile page: kudo của 1 người nhận
+  @@index([receiverId, status, createdAt(sort: Desc)])
+  @@map("kudos")
+}
+
+model KudoMedia {
+  id           String      @id @default(uuid())
+  kudoId       String      @map("kudo_id")
+  type         MediaType
+  url          String
+  status       MediaStatus @default(processing)
+  durationSecs Int?        @map("duration_secs")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  // Cascade delete: xóa kudo → xóa media luôn
+  kudo Kudo @relation(fields: [kudoId], references: [id], onDelete: Cascade)
+
+  @@map("kudo_media")
+}
+
+model PointLedger {
+  id           String     @id @default(uuid())
+  userId       String     @map("user_id")
+  amount       Int        // dương = nhận kudo, âm = đổi thưởng
+  balanceAfter Int        @map("balance_after")  // snapshot tại thời điểm giao dịch
+  type         LedgerType
+  kudoId       String?    @map("kudo_id")        // nullable — chỉ set khi type=received
+  redemptionId String?    @map("redemption_id")  // nullable — chỉ set khi type=redeemed
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  user       User        @relation(fields: [userId],       references: [id])
+  kudo       Kudo?       @relation(fields: [kudoId],       references: [id])
+  redemption Redemption? @relation(fields: [redemptionId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("point_ledger")
+}
+
+model Reward {
+  id               String     @id @default(uuid())
+  name             String
+  description      String?
+  pointsCost       Int        @map("points_cost")
+  imageUrl         String?    @map("image_url")
+  isActive         Boolean    @default(true) @map("is_active")
+  quantityTotal    Int        @map("quantity_total")
+  quantityRedeemed Int        @default(0) @map("quantity_redeemed")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  redemptions Redemption[]
+
+  @@map("rewards")
+}
+
+model Redemption {
+  id             String           @id @default(uuid())
+  userId         String           @map("user_id")
+  rewardId       String           @map("reward_id")
+  pointsSpent    Int              @map("points_spent")
+  status         RedemptionStatus @default(completed)
+  // UNIQUE constraint — chốt chặn double-spend ở tầng DB
+  idempotencyKey String           @unique @map("idempotency_key")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  user   User          @relation(fields: [userId],   references: [id])
+  reward Reward        @relation(fields: [rewardId], references: [id])
+  ledger PointLedger[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("redemptions")
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  kudoId    String   @map("kudo_id")
+  userId    String   @map("user_id")
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  kudo Kudo @relation(fields: [kudoId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  // 1 user chỉ react 1 lần với 1 emoji trên 1 kudo
+  @@unique([kudoId, userId, emoji])
+  @@index([kudoId])
+  @@map("reactions")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  kudoId    String   @map("kudo_id")
+  userId    String   @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  kudo Kudo @relation(fields: [kudoId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([kudoId, createdAt])
+  @@map("comments")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  refId     String           @map("ref_id")
+  isRead    Boolean          @default(false) @map("is_read")
+  expiresAt DateTime         @map("expires_at")  // tự cleanup sau 30 ngày
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  // Partial index — chỉ index unread, bảng lớn vẫn query nhanh
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
