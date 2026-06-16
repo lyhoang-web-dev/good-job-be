@@ -188,7 +188,7 @@ INSERT INTO kudo_media (
     'e0000000-0000-4000-8000-000000000001',
     'c0000000-0000-4000-8000-000000000001',
     'image',
-    'https://example.com/dummy/kudo-celebration.jpg',
+    'https://picsum.photos/seed/goodjob-kudo/800/450',
     'ready',
     NULL,
     NOW() - INTERVAL '5 days'
