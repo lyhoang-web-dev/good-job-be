@@ -1,0 +1,35 @@
+# Render Blueprint — Good Job API
+# Tài liệu: https://render.com/docs/blueprint-spec
+# Cách dùng: dashboard Render -> New -> Blueprint -> kết nối repo này.
+# Các giá trị bí mật (sync: false) sẽ được nhập trong dashboard ở lần deploy đầu.
+services:
+  - type: web
+    name: good-job-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore          # region free gần Việt Nam nhất; đổi nếu cần
+    healthCheckPath: /api/health
+    autoDeploy: true            # tự deploy khi push lên nhánh đã kết nối
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true     # Render tự sinh một lần rồi giữ nguyên
+      - key: DATABASE_URL       # chuỗi kết nối Neon
+        sync: false
+      - key: REDIS_URL          # URL rediss:// của Upstash
+        sync: false
+      - key: CORS_ORIGIN        # https://<frontend-cua-ban>.vercel.app
+        sync: false
+      - key: FE_URL             # https://<frontend-cua-ban>.vercel.app
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL # https://<api-cua-ban>.onrender.com/api/auth/google/callback
+        sync: false
+# Lưu ý: PORT do Render tự inject; app tự đọc process.env.PORT.
+# KHÔNG chạy migration ở đây — hãy chạy từ máy của bạn lên Neon
+# (xem DEPLOYMENT.md, Bước 3). Image production không có Prisma CLI.
