@@ -1,7 +1,7 @@
--- Chỉ thêm user demo (local auth, mật khẩu: password123)
+-- Adds demo users only (local auth, password: password123)
 -- psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/dummy-users.sql
 --
--- Xóa rồi insert lại cùng id/email (không đụng user từ seed @goodjob.com)
+-- Delete then re-insert with same id/email (does not touch @goodjob.com seed users)
 
 BEGIN;
 
@@ -12,7 +12,7 @@ DELETE FROM users WHERE id IN (
   'a0000000-0000-4000-8000-000000000013'
 );
 
--- Cùng bcrypt 'password123' (cost 10) như prisma/dummy-data.sql
+-- Same bcrypt 'password123' (cost 10) as prisma/dummy-data.sql
 INSERT INTO users (
   id,
   email,

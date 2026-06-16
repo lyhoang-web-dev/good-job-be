@@ -1,15 +1,15 @@
 -- Dummy data for Good Job (PostgreSQL)
--- Chạy sau migrate:
+-- Run after migrate:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/dummy-data.sql
--- Hoặc: docker exec -i goodjob-postgres psql -U postgres -d goodjob -v ON_ERROR_STOP=1 -f - < prisma/dummy-data.sql
+-- Or: docker exec -i goodjob-postgres psql -U postgres -d goodjob -v ON_ERROR_STOP=1 -f - < prisma/dummy-data.sql
 --
--- Mật khẩu mọi user dummy: password123 (bcrypt bên dưới)
--- Email *@sql-dummy.goodjob — tránh trùng seed prisma/seed.ts
--- Chạy lại file này sẽ xóa bản ghi dummy cũ (cùng id) rồi insert lại
+-- Password for all dummy users: password123 (bcrypt below)
+-- Emails *@sql-dummy.goodjob — avoid colliding with the prisma seed
+-- Re-running this file deletes the old dummy rows (same ids), then re-inserts
 
 BEGIN;
 
--- Xóa theo thứ tự FK (con → cha)
+-- Delete in FK order (child → parent)
 DELETE FROM notifications WHERE id IN (
   'n0000000-0000-4000-8000-000000000001',
   'n0000000-0000-4000-8000-000000000002'
@@ -44,7 +44,7 @@ DELETE FROM users WHERE id IN (
 );
 DELETE FROM rewards WHERE id IN ('sql-reward-book', 'sql-reward-lunch');
 
--- Bcrypt hash của 'password123' (cost 10), tương thích bcryptjs
+-- Bcrypt hash of 'password123' (cost 10), compatible with bcryptjs
 INSERT INTO users (
   id, email, name, avatar_url, password, role, balance, is_active, created_at, updated_at
 ) VALUES

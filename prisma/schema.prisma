@@ -98,7 +98,7 @@ model GivingBudget {
 
   user User @relation(fields: [userId], references: [id])
 
-  // Mỗi user chỉ có 1 record per tháng — nền tảng lazy reset
+  // One record per user per month — lazy reset by the platform
   @@unique([userId, yearMonth])
   @@index([userId, yearMonth])
   @@map("giving_budgets")
@@ -122,9 +122,9 @@ model Kudo {
   comments  Comment[]
   ledger    PointLedger[]
 
-  // Index cho feed query: WHERE status='active' ORDER BY created_at DESC
+  // Index for the feed query: WHERE status='active' ORDER BY created_at DESC
   @@index([status, createdAt(sort: Desc)])
-  // Index cho profile page: kudo của 1 người nhận
+  // Index for the profile page: kudos for a single recipient
   @@index([receiverId, status, createdAt(sort: Desc)])
   @@map("kudos")
 }
@@ -138,7 +138,7 @@ model KudoMedia {
   durationSecs Int?        @map("duration_secs")
   createdAt    DateTime    @default(now()) @map("created_at")
 
-  // Cascade delete: xóa kudo → xóa media luôn
+  // Cascade delete: removing a kudo also removes its media
   kudo Kudo @relation(fields: [kudoId], references: [id], onDelete: Cascade)
 
   @@map("kudo_media")
@@ -147,11 +147,11 @@ model KudoMedia {
 model PointLedger {
   id           String     @id @default(uuid())
   userId       String     @map("user_id")
-  amount       Int        // dương = nhận kudo, âm = đổi thưởng
-  balanceAfter Int        @map("balance_after")  // snapshot tại thời điểm giao dịch
+  amount       Int        // positive = kudo received, negative = reward redemption
+  balanceAfter Int        @map("balance_after")  // snapshot at the time of the transaction
   type         LedgerType
-  kudoId       String?    @map("kudo_id")        // nullable — chỉ set khi type=received
-  redemptionId String?    @map("redemption_id")  // nullable — chỉ set khi type=redeemed
+  kudoId       String?    @map("kudo_id")        // nullable — set only when type=received
+  redemptionId String?    @map("redemption_id")  // nullable — set only when type=redeemed
   createdAt    DateTime   @default(now()) @map("created_at")
 
   user       User        @relation(fields: [userId],       references: [id])
@@ -185,7 +185,7 @@ model Redemption {
   rewardId       String           @map("reward_id")
   pointsSpent    Int              @map("points_spent")
   status         RedemptionStatus @default(completed)
-  // UNIQUE constraint — chốt chặn double-spend ở tầng DB
+  // UNIQUE constraint — blocks double-spend at the DB layer
   idempotencyKey String           @unique @map("idempotency_key")
   createdAt      DateTime         @default(now()) @map("created_at")
 
@@ -207,7 +207,7 @@ model Reaction {
   kudo Kudo @relation(fields: [kudoId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
-  // 1 user chỉ react 1 lần với 1 emoji trên 1 kudo
+  // a user can react with a given emoji only once per kudo
   @@unique([kudoId, userId, emoji])
   @@index([kudoId])
   @@map("reactions")
@@ -234,12 +234,12 @@ model Notification {
   type      NotificationType
   refId     String           @map("ref_id")
   isRead    Boolean          @default(false) @map("is_read")
-  expiresAt DateTime         @map("expires_at")  // tự cleanup sau 30 ngày
+  expiresAt DateTime         @map("expires_at")  // auto-cleanup after 30 days
   createdAt DateTime         @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id])
 
-  // Partial index — chỉ index unread, bảng lớn vẫn query nhanh
+  // Partial index — only unread rows, keeps queries fast on a large table
   @@index([userId, isRead, createdAt(sort: Desc)])
   @@map("notifications")
 }

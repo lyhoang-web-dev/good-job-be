@@ -1,35 +1,35 @@
 # Render Blueprint — Good Job API
-# Tài liệu: https://render.com/docs/blueprint-spec
-# Cách dùng: dashboard Render -> New -> Blueprint -> kết nối repo này.
-# Các giá trị bí mật (sync: false) sẽ được nhập trong dashboard ở lần deploy đầu.
+# Docs: https://render.com/docs/blueprint-spec
+# Usage: Render dashboard -> New -> Blueprint -> connect this repo.
+# Secret values (sync: false) are entered in the dashboard on first deploy.
 services:
   - type: web
     name: good-job-api
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
-    region: singapore          # region free gần Việt Nam nhất; đổi nếu cần
+    region: singapore          # closest free region to Vietnam; change if needed
     healthCheckPath: /api/health
-    autoDeploy: true            # tự deploy khi push lên nhánh đã kết nối
+    autoDeploy: true            # deploy on push to the connected branch
     envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        generateValue: true     # Render tự sinh một lần rồi giữ nguyên
-      - key: DATABASE_URL       # chuỗi kết nối Neon
+        generateValue: true     # Render generates once and keeps it
+      - key: DATABASE_URL       # Neon connection string
         sync: false
-      - key: REDIS_URL          # URL rediss:// của Upstash
+      - key: REDIS_URL          # Upstash rediss:// URL
         sync: false
-      - key: CORS_ORIGIN        # https://<frontend-cua-ban>.vercel.app
+      - key: CORS_ORIGIN        # https://<your-frontend>.vercel.app
         sync: false
-      - key: FE_URL             # https://<frontend-cua-ban>.vercel.app
+      - key: FE_URL             # https://<your-frontend>.vercel.app
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
-      - key: GOOGLE_CALLBACK_URL # https://<api-cua-ban>.onrender.com/api/auth/google/callback
+      - key: GOOGLE_CALLBACK_URL # https://<your-api>.onrender.com/api/auth/google/callback
         sync: false
-# Lưu ý: PORT do Render tự inject; app tự đọc process.env.PORT.
-# KHÔNG chạy migration ở đây — hãy chạy từ máy của bạn lên Neon
-# (xem DEPLOYMENT.md, Bước 3). Image production không có Prisma CLI.
+# Note: PORT is injected by Render automatically; the app reads process.env.PORT.
+# Migrations are NOT run here — run `prisma migrate deploy` from your machine
+# against the database. The production image has no Prisma CLI.

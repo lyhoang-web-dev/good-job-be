@@ -5,7 +5,7 @@ coverage
 *.log
 *.tsbuildinfo
 
-# Env & secrets (giữ .env.example)
+# Env & secrets (keep .env.example)
 .env
 .env.local
 .env.*.local
@@ -20,5 +20,5 @@ Thumbs.db
 .idea
 .cursor
 
-# SQL one-off cá nhân (email admin cục bộ)
+# Personal one-off SQL (local admin email)
 prisma/set-admin-*.sql
