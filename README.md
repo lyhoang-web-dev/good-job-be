@@ -4,6 +4,61 @@ Internal API for an employee recognition program (**Express 5**, **TypeScript**,
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TD
+    U(["User / Browser"])
+
+    subgraph FE_HOST["Vercel · Frontend"]
+        FE["React 19 + Vite SPA<br/>Chakra UI · TanStack Router/Query"]
+    end
+
+    subgraph BE_HOST["Render · Backend (Docker: Node + ffmpeg)"]
+        API["Express 5 API · Prisma<br/>JWT auth · idempotency"]
+        WORKER["Media worker (BullMQ)<br/>ffprobe · validation"]
+        DISK[/"Uploads — local disk<br/>ephemeral · → Cloudflare R2 (planned)"/]
+    end
+
+    PG[("Neon<br/>PostgreSQL")]
+    REDIS[("Upstash · Redis<br/>BullMQ queue · SSE pub/sub · idempotency")]
+    OAUTH{{"Google OAuth 2.0"}}
+
+    U -->|"1 · load SPA (HTTPS)"| FE
+    U -->|"2 · REST · Bearer JWT"| API
+    U -->|"3 · Sign in with Google"| API
+    API -->|"4 · redirect"| OAUTH
+    OAUTH -->|"5 · callback + code"| API
+    API -.->|"6 · redirect w/ token in #fragment"| FE
+
+    U -->|"upload media (multipart)"| API
+    API -->|"write file"| DISK
+    API -->|"enqueue job"| REDIS
+    REDIS -->|"dequeue"| WORKER
+    WORKER -->|"read file"| DISK
+    WORKER -->|"update status"| PG
+    WORKER -->|"publish event"| REDIS
+
+    API -->|"Prisma ORM"| PG
+    API -->|"idempotency · pub/sub"| REDIS
+    API -.->|"SSE /api/events · live updates"| U
+```
+
+**Components**
+
+| Service | Role |
+|---------|------|
+| **Vercel** | Hosts the React/Vite SPA (static assets). |
+| **Render** | Runs the backend container: Express API + BullMQ media worker + ffmpeg/ffprobe. |
+| **Neon** | Managed PostgreSQL, accessed via Prisma. |
+| **Upstash** | Managed Redis — three roles: BullMQ media queue, SSE pub/sub, and idempotency cache/lock. |
+| **Google OAuth 2.0** | Social login; the JWT is handed to the SPA via the URL fragment on callback. |
+| **Uploads** | Written to the container's local disk (ephemeral on Render's free tier); planned move to Cloudflare R2 for durable media. |
+
+Auth is **Bearer-token** based (no cross-site cookies), so the cross-origin FE ↔ BE setup only needs CORS configured to the frontend origin.
+
+---
+
 ## Docker Hub (prebuilt image)
 
 **Repository:** `htly/goodjobs` _(your Docker Hub namespace — no image published yet)_
@@ -121,6 +176,27 @@ Type-check the entire project (including `tests/`):
 ```bash
 npx tsc --noEmit
 ```
+
+---
+
+## Seed data & test accounts
+
+`npm run db:seed` loads `prisma/dummy-data.sql` + `prisma/dummy-users.sql`. **All seeded users share the password `password123`.**
+
+**Admin login:** `sql-admin@sql-dummy.goodjob` / `password123` — has the `admin` role and can access `/admin/rewards`.
+
+| Email | Role |
+|-------|------|
+| `sql-admin@sql-dummy.goodjob` | **admin** — can access `/admin/rewards` |
+| `demo-dan@goodjob.com` | user |
+| `demo-emma@goodjob.com` | user |
+| `demo-frank@goodjob.com` | user |
+| `demo-grace@goodjob.com` | user |
+| `sql-alice@sql-dummy.goodjob` | user |
+| `sql-bob@sql-dummy.goodjob` | user |
+| `sql-carol@sql-dummy.goodjob` | user |
+
+> Dummy accounts for local/demo use only.
 
 ---
 
